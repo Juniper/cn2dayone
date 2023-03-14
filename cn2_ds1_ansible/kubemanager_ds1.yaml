@@ -1,0 +1,21 @@
+apiVersion: configplane.juniper.net/v1alpha1
+kind: Kubemanager
+metadata:
+  name: kubemanager-ds1cluster
+  namespace: contrail
+spec:
+  common:
+    containers:
+    - image: enterprise-hub.jnpr.net/contrail-container-prod/contrail-k8s-kubemanager:22.4.0.284
+      name: contrail-k8s-kubemanager
+    nodeSelector:
+      node-role.kubernetes.io/control-plane: ""
+  podV4Subnet: 10.234.64.0/18
+  serviceV4Subnet: 10.234.0.0/18
+  podV6Subnet: fd85:ee78:d8a6:8608::1:0000/112
+  serviceV6Subnet: fd85:ee78:d8a6:8608::1000/116
+  clusterName: ds1-cluster
+  kubeconfigSecretName: ds1-kubeconfig
+  enableNad: true
+  listenerPort: 19446
+  constantRouteTargetNumber: 7699
