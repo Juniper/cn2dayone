@@ -7,8 +7,8 @@ https://www.juniper.net/documentation/us/en/software/cn-cloud-native22.4/cn-clou
 
 Upon cloning the repo user will see 2 folders: 
 
-cn2_deploy_central_cluster
-cn2_deploy_distributed_cluster
+[1] cn2_deploy_central_cluster
+[2] cn2_deploy_distributed_cluster
 
 Both will have 5 yaml playbook to install a cluster from scratch.
 Playbooks are marked in numerical order defining the order it needs to be executed in lab.
