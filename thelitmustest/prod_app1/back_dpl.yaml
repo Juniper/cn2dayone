@@ -1,0 +1,56 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: t2-prod-app1
+  name: t2-prod-app1-backend-deployment
+spec:
+  replicas: 2
+  selector:
+       matchLabels:
+          env: t2-prod-app1
+          svc: t2-prod-app1-backend-deployment
+          vn: t2-prod-app1-backend-vn
+  template:
+    metadata:
+      labels:
+        env: t2-prod-app1
+        vn: t2-prod-app1-backend-vn
+        svc: t2-prod-app1-backend-deployment
+      annotations:
+        k8s.v1.cni.cncf.io/networks: |
+          [
+            {
+              "name": "t2-prod-app1-backend-vn",
+              "namespace": "t2-prod-app1",
+              "cni-args": {
+              "net.juniper.contrail.podnetwork": true
+               }
+            }
+          ]
+    spec:
+      containers:
+      - name: webserver
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: t2-prod-app1
+  name: t2-prod-app1-backend-service
+  annotations:
+    net.juniper.contrail.podnetwork: "t2-prod-app1/t2-prod-app1-backend-vn"
+spec:
+  type: ClusterIP
+  ports:
+  - name: web
+    port: 80
+    protocol: TCP
+  selector:
+    env: t2-prod-app1
+    svc: t2-prod-app1-backend-deployment
+    vn: t2-prod-app1-backend-vn

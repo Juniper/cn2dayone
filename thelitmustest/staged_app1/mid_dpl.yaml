@@ -1,0 +1,79 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: t2-staged-app1
+  name: t2-staged-app1-middleware-deployment
+spec:
+  replicas: 2
+  selector:
+       matchLabels:
+          env: t2-staged-app1
+          svc: t2-staged-app1-middleware-deployment
+          vn: t2-staged-app1-middleware-vn
+  template:
+    metadata:
+      labels:
+        env: t2-staged-app1
+        vn: t2-staged-app1-middleware-vn
+        svc: t2-staged-app1-middleware-deployment
+      annotations:
+        k8s.v1.cni.cncf.io/networks: |
+          [
+            {
+              "name": "t2-staged-app1-middleware-vn",
+              "namespace": "t2-staged-app1",
+              "cni-args": {
+              "net.juniper.contrail.podnetwork": true
+               }
+            }
+          ]
+    spec:
+      containers:
+        - name: t2-staged-app1-middleware-app
+          image: kolachalam/cn2dayone:middleware
+          imagePullPolicy: Always
+          command: [ "python3", "app.py" ]
+          #args: [ "while true; do sleep 30; done;" ]
+          ports:
+            - containerPort: 90
+          env:
+            - name: POD_NODE
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: T3_URL
+              value: "http://t2-staged-app1-backend-service.t2-staged-app1.svc.central.cluster:80"
+
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: t2-staged-app1
+  name: t2-staged-app1-middleware-service
+  annotations:
+    net.juniper.contrail.podnetwork: "t2-staged-app1/t2-staged-app1-middleware-vn"
+spec:
+  type: ClusterIP
+  ports:
+  - name: web
+    port: 90
+    protocol: TCP
+  selector:
+    env: t2-staged-app1
+    svc: t2-staged-app1-middleware-deployment
+    vn: t2-staged-app1-middleware-vn

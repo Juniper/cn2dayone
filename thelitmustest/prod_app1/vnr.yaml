@@ -1,0 +1,149 @@
+# To Apply:   kubectl apply -f multiple-vnr-hub-spoke-same-namespace.yaml
+# To Cleanup: kubectl delete -f multiple-vnr-hub-spoke-same-namespace.yaml
+# This MultiResource Yaml demonstrates how VirtualNetworkRouters can be used
+# demonstrate hub-spoke connection model where all VirtualNetworks attached to
+# VirtualNetworkRouter (spoke) and reach VirtualNetworkRouters (hub) at the
+# same time restricting spoke to spoke communication. Since all objects are
+# residing in same namespace (t2-prod-app1), one spoke VirtualNetworkRouter is suffice.
+# In this example, vn-1, vn-2 cannot reach eachother but vn-3 and vn-4. Also
+# vn-3 and vn-4 cannot reach eachother as well
+
+#apiVersion: v1
+#kind: Namespace
+#metadata:
+#  name: t2-prod-app1
+#  labels:
+#    ns: t2-prod-app1
+#spec:
+#  finalizers:
+#  - kubernetes
+---
+apiVersion: core.contrail.juniper.net/v1alpha1
+kind: Subnet
+metadata:
+  namespace: t2-prod-app1
+  name: t2-prod-app1-frontend-sn
+  annotations:
+    core.juniper.net/display-name: t2-prod-app1-frontend-sn
+spec:
+  cidr: "21.1.1.0/24"
+  defaultGateway: 21.1.1.254
+---
+apiVersion: core.contrail.juniper.net/v1alpha1
+kind: Subnet
+metadata:
+  namespace: t2-prod-app1
+  name: t2-prod-app1-middleware-sn
+  annotations:
+    core.juniper.net/display-name: t2-prod-app1-middleware-sn
+spec:
+  cidr: "21.1.2.0/24"
+  defaultGateway: 21.1.2.254
+---
+apiVersion: core.contrail.juniper.net/v1alpha1
+kind: Subnet
+metadata:
+  namespace: t2-prod-app1
+  name: t2-prod-app1-backend-sn
+  annotations:
+    core.juniper.net/display-name: t2-prod-app1-backend-sn
+spec:
+  cidr: "21.1.3.0/24"
+  defaultGateway: 21.1.3.254
+---
+apiVersion: core.contrail.juniper.net/v2
+kind: VirtualNetwork
+metadata:
+  namespace: t2-prod-app1
+  name: t2-prod-app1-frontend-vn
+  annotations:
+    core.juniper.net/display-name: t2-prod-app1-frontend-vn
+  labels:
+    vn: spoke
+spec:
+  podNetwork: true
+  v4SubnetReference:
+    apiVersion: core.contrail.juniper.net/v2
+    kind: Subnet
+    namespace: t2-prod-app1
+    name: t2-prod-app1-frontend-sn
+---
+apiVersion: core.contrail.juniper.net/v2
+kind: VirtualNetwork
+metadata:
+  namespace: t2-prod-app1
+  name: t2-prod-app1-backend-vn
+  annotations:
+    core.juniper.net/display-name: t2-prod-app1-backend-vn
+  labels:
+    vn: spoke
+spec:
+  podNetwork: true
+  v4SubnetReference:
+    apiVersion: core.contrail.juniper.net/v2
+    kind: Subnet
+    namespace: t2-prod-app1
+    name: t2-prod-app1-backend-sn
+---
+apiVersion: core.contrail.juniper.net/v2
+kind: VirtualNetwork
+metadata:
+  namespace: t2-prod-app1
+  name: t2-prod-app1-middleware-vn
+  annotations:
+    core.juniper.net/display-name: t2-prod-app1-middleware-vn
+  labels:
+    vn: hub
+spec:
+  podNetwork: true
+  v4SubnetReference:
+    apiVersion: core.contrail.juniper.net/v2
+    kind: Subnet
+    namespace: t2-prod-app1
+    name: t2-prod-app1-middleware-sn
+---
+apiVersion: core.contrail.juniper.net/v1alpha1
+kind: VirtualNetworkRouter
+metadata:
+  namespace: t2-prod-app1
+  name: vnr-spoke
+  annotations:
+    core.juniper.net/display-name: vnr-spoke
+  labels:
+    vnr: spoke
+spec:
+  type: spoke
+  virtualNetworkSelector:
+    matchLabels:
+      vn: spoke
+  import:
+    virtualNetworkRouters:
+      - virtualNetworkRouterSelector:
+          matchLabels:
+            vnr: hub
+        namespaceSelector:
+          matchLabels:
+            ns: t2-prod-app1
+---
+apiVersion: core.contrail.juniper.net/v1alpha1
+kind: VirtualNetworkRouter
+metadata:
+  namespace: t2-prod-app1
+  name: vnr-hub
+  annotations:
+    core.juniper.net/display-name: vnr-hub
+  labels:
+    vnr: hub
+spec:
+  type: hub
+  virtualNetworkSelector:
+    matchLabels:
+      vn: hub
+  import:
+    virtualNetworkRouters:
+      - virtualNetworkRouterSelector:
+          matchLabels:
+            vnr: spoke
+        namespaceSelector:
+          matchLabels:
+            ns: t2-prod-app1

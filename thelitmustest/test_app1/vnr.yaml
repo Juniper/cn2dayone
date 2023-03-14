@@ -1,0 +1,46 @@
+---
+apiVersion: core.contrail.juniper.net/v1alpha1
+kind: VirtualNetworkRouter
+metadata:
+  namespace: t2-test-app1
+  name: vnr-spoke
+  annotations:
+    core.juniper.net/display-name: vnr-spoke
+  labels:
+    vnr: spoke
+spec:
+  type: spoke
+  virtualNetworkSelector:
+    matchLabels:
+      vn: spoke
+  import:
+    virtualNetworkRouters:
+      - virtualNetworkRouterSelector:
+          matchLabels:
+            vnr: hub
+        namespaceSelector:
+          matchLabels:
+            ns: t2-test-app1
+---
+apiVersion: core.contrail.juniper.net/v1alpha1
+kind: VirtualNetworkRouter
+metadata:
+  namespace: t2-test-app1
+  name: vnr-hub
+  annotations:
+    core.juniper.net/display-name: vnr-hub
+  labels:
+    vnr: hub
+spec:
+  type: hub
+  virtualNetworkSelector:
+    matchLabels:
+      vn: hub
+  import:
+    virtualNetworkRouters:
+      - virtualNetworkRouterSelector:
+          matchLabels:
+            vnr: spoke
+        namespaceSelector:
+          matchLabels:
+            ns: t2-test-app1

@@ -1,0 +1,64 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: t2-test-app1
+  name: t2-test-app1-frontend-deployment
+spec:
+  replicas: 2
+  selector:
+       matchLabels:
+          env: t2-test-app1
+          svc: t2-test-app1-frontend-deployment
+          vn: t2-test-app1-frontend-vn
+  template:
+    metadata:
+      labels:
+        env: t2-test-app1
+        vn: t2-test-app1-frontend-vn
+        svc: t2-test-app1-frontend-deployment
+      annotations:
+        k8s.v1.cni.cncf.io/networks: |
+          [
+            {
+              "name": "t2-test-app1-frontend-vn",
+              "namespace": "t2-test-app1",
+              "cni-args": {
+              "net.juniper.contrail.podnetwork": true
+               }
+            }
+          ]
+    spec:
+      containers:
+        - name: t2-test-app1-frontend-app
+          image: kolachalam/cn2dayone:frontendv1
+          imagePullPolicy: Always
+          command: [ "python3", "app.py" ]
+          #args: [ "while true; do sleep 30; done;" ]
+          ports:
+            - containerPort: 80
+          env:
+            - name: POD_NODE
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: URL1
+              value: "http://t2-staged-app1-middleware-service.t2-staged-app1.svc.central.cluster:90"
+            - name: URL2
+              value: "http://t2-test-app1-middleware-service.t2-test-app1.svc.central.cluster:90"
+            - name: URL3
+              value: "http://t2-prod-app1-middleware-service.t2-prod-app1.svc.central.cluster:90"
+
+

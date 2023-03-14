@@ -1,0 +1,76 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: t2-test-app1-frontend-service
+  namespace: t2-test-app1
+  annotations:
+    net.juniper.contrail.podnetwork: t2-test-app1/t2-test-app1-frontend-vn
+spec:
+  type: ClusterIP
+  ports:
+  - name: web
+    port: 80
+    protocol: TCP
+  selector:
+    env: t2-test-app1 
+    svc: t2-test-app1-frontend-deployment
+    vn: t2-test-app1-frontend-vn 
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: t2-test-app1-frontend-service-external
+  namespace: t2-test-app1
+  annotations:
+    service.contrail.juniper.net/externalNetwork: default/t2-ext-svc-vn
+spec:
+  type: LoadBalancer
+  ports:
+  - name: web
+    port: 80
+    protocol: TCP
+  selector:
+    env: t2-test-app1 
+    svc: t2-test-app1-frontend-deployment
+    vn: t2-test-app1-frontend-vn
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: t2-test-app1
+  name: t2-test-app1-middleware-service
+  annotations:
+    net.juniper.contrail.podnetwork: "t2-test-app1/t2-test-app1-middleware-vn"
+spec:
+  type: ClusterIP
+  ports:
+  - name: web
+    port: 90
+    protocol: TCP
+  selector:
+    env: t2-test-app1
+    svc: t2-test-app1-middleware-deployment
+    vn: t2-test-app1-middleware-vn
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: t2-test-app1
+  name: t2-test-app1-backend-service
+  annotations:
+    net.juniper.contrail.podnetwork: "t2-test-app1/t2-test-app1-backend-vn"
+spec:
+  type: ClusterIP
+  ports:
+  - name: web
+    port: 80
+    protocol: TCP
+  selector:
+    env: t2-test-app1
+    svc: t2-test-app1-backend-deployment
+    vn: t2-test-app1-backend-vn

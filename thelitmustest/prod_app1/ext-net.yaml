@@ -1,0 +1,30 @@
+---
+apiVersion: core.contrail.juniper.net/v2
+kind: VirtualNetwork
+metadata:
+  name: t2-ext-svc-vn
+  namespace: t2-prod-app1
+  annotations:
+    core.juniper.net/display-name: t2-ext-svc-vn
+  labels:
+    service.contrail.juniper.net/externalNetworkSelector: default-external
+spec:
+  routeTargetList:
+    - 'target:64512:10000'
+  fabricForwarding: true
+  v4SubnetReference:
+    apiVersion: core.contrail.juniper.net/v2
+    namespace: t2-prod-app1
+    kind: Subnet
+    name: t2-ext-svc-sn
+---
+apiVersion: core.contrail.juniper.net/v2
+kind: Subnet
+metadata:
+  name: t2-ext-svc-sn
+  namespace: t2-prod-app1
+  annotations:
+    core.juniper.net/display-name: t2-ext-svc-sn
+spec:
+  cidr: "10.219.90.162/28"
+  defaultGateway: "10.219.90.161"
