@@ -1,0 +1,58 @@
+allcentral:
+    hosts:
+      centraljumphost:
+        ansible_host: 10.219.90.82
+      centralctrl:
+        ansible_host: 10.219.90.83
+      centralworker1:
+        ansible_host: 10.219.90.84
+      centralworker2:
+        ansible_host: 10.219.90.85
+    vars:
+      root: juniper123
+
+alldsi:
+    hosts:
+      ds1jumphost:
+        ansible_host: 10.219.90.88
+      ds1ctrl:
+        ansible_host: 10.219.90.89
+      ds1worker1:
+        ansible_host: 10.219.90.90
+      ds1worker2:
+        ansible_host: 10.219.90.91
+
+
+
+jumphost:
+    hosts:
+      centraljumphost:
+        ansible_host: 10.219.90.82
+      ds1jumphost:
+        ansible_host: 10.219.90.88
+    vars:
+      root: juniper123
+
+centralk8svm: 
+    hosts:
+      centralctrl:
+        ansible_host: 10.219.90.83
+      centralworker1:
+        ansible_host: 10.219.90.84
+      centralworker2:
+        ansible_host: 10.219.90.85
+  
+    vars:
+      root: juniper123
+
+ds1k8svm:
+    hosts:
+      ds1ctrl:
+        ansible_host: 10.219.90.89
+      ds1worker1:
+        ansible_host: 10.219.90.90
+      ds1worker2:
+        ansible_host: 10.219.90.91
+
+    vars:
+      root: juniper123

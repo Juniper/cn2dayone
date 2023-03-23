@@ -1,0 +1,40 @@
+all:
+    hosts:                               # list all nodes here
+        ds1ctrl:                         # desired hostname
+            ansible_host: ds1ctrl
+        ds1worker1:
+            ansible_host: ds1worker1
+        ds1worker2:
+            ansible_host: ds1worker2
+    vars:
+        ansible_user: root
+        artifacts_dir: /tmp/mycluster
+        cluster_name: ds1.cluster
+        container_manager: crio          # container runtime
+        download_container: false
+        download_localhost: true
+        download_run_once: true
+        enable_dual_stack_networks: true
+        enable_nodelocaldns: false
+        etcd_deployment_type: host
+        host_key_checking: false
+        kube_network_plugin: cni
+        kube_network_plugin_multus: false
+        kubeconfig_localhost: true
+        kubectl_localhost: true
+        kubelet_deployment_type: host
+        override_system_hostname: true
+kube-master:
+    hosts:                   # hostname of ctrl plane node (from hosts section)
+        ds1ctrl:
+kube-node:
+    hosts:                   # hostnames of worker nodes (from hosts section)
+        ds1worker1:
+        ds1worker2:
+etcd:
+    hosts:                   # hostname of ctrl plane node (from hosts section)
+        ds1ctrl:
+k8s-cluster:
+    children:
+        kube-master:
+        kube-node:

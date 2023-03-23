@@ -1,0 +1,121 @@
+---
+# Playbook to prepare vms image, network, customize and lastly spawn the vms
+- name: Playbook to prepare vms image, network, customize and lastly spawn the vms
+  hosts: localhost
+  connection: local
+  vars:
+    vms:
+      centraljumphost:
+        memory: 32768
+        vcpu: 8
+        network: mgmt
+      centralctrl:
+        memory: 32768
+        vcpu: 8
+        network: mgmt
+      centralworker1:
+        memory: 16384
+        vcpu: 4
+        network: mgmt
+      centralworker2:
+        memory: 16384
+        vcpu: 4
+        network: mgmt
+
+
+    base_image_name: ubuntu-20.04-server-cloudimg-amd64.img
+    base_image_url: http://cloud-images-archive.ubuntu.com/releases/focal/release-20220131/{{ base_image_name }}
+    base_image_sha: ea3d47e86e0e3d5b1941a6bb4d5efec7
+    libvirt_pool_dir: "/var/lib/libvirt/images"
+    vm_root_pass: juniper123
+    ssh_key: /root/.ssh/id_rsa.pub
+
+  tasks:
+  #Populate BMS /etc/hosts with the hosts defined in inventory file
+  - name: Populate /etc/hosts with hosts from inventory file
+    lineinfile:
+      dest: /etc/hosts
+      regexp: '.*{{ item }}$'
+      line: "{{ hostvars[item].ansible_host }} {{item}}"
+      state: present
+    when: hostvars[item].ansible_host is defined
+    with_items: "{{ groups.all }}"
+
+  #Populate network yaml files(in the directory playbook is running from) for the vms to be created
+  - name: Create network Yaml files
+    shell: "/root/cn2_deploy_ansible/cn2_central_ansible/network_yaml_create.sh"
+    register: "output"
+
+  # Check if the VMs are already spawned
+  - name: get list of vms
+    virt:
+      command: "list_vms"
+    register: vms_list
+  
+  #   # Customize and spawn VMs if not already installed on the BMS
+  - name: Install VM if not in the vm list
+    block:  
+      # Copy image downloaded from internet under /root/ into /var/lib/libvirt in qcow2 format per vm
+      - name: Copy Image from root directory to libvirt images
+        copy:
+          dest: "{{ libvirt_pool_dir }}/{{ item.key }}.qcow2"
+          src: "/root/{{ base_image_name }}"
+          force: no
+          remote_src: yes 
+          mode: 0660
+        register: copy_results 
+        with_dict: "{{ vms }}"
+      
+      #Resize the image to 50G
+      - name: Resize Image
+        command: |
+          qemu-img resize /var/lib/libvirt/images/{{ item.key }}.qcow2 +50G
+        with_dict: "{{ vms }}"
+
+      # Configure the image with many basic configuration like ssh , password, network file etc
+      - name: Configure the image
+        command: |
+          virt-customize -a /var/lib/libvirt/images/{{ item.key }}.qcow2 \
+          --root-password password:juniper123 \
+          --hostname {{ item.key }} \
+          --upload /root/cn2_deploy_ansible/cn2_central_ansible/{{ item.key }}.yaml:/etc/netplan/00-installer-config.yaml \
+          --mkdir /root/.ssh \
+          --copy-in /root/.ssh/id_rsa.pub:/root/.ssh/ \
+          --copy /root/.ssh/id_rsa.pub:/root/.ssh/authorized_keys \
+          --run-command 'sed -i "s/.*PubkeyAuthentication yes/PubkeyAuthentication yes/g" /etc/ssh/sshd_config' \
+          --run-command 'sed -i "s/.*PasswordAuthentication no/PasswordAuthentication yes/g" /etc/ssh/sshd_config' \
+          --run-command 'sed -i "s/.*PermitRootLogin probhit-password/PermitRootLogin yes/g" /etc/ssh/sshd_config' \
+          --run-command 'sed -i "s/Unattended-Upgrade \"1\"/Unattended-Upgrade \"0\"/g" /etc/apt/apt.conf.d/20auto-upgrades' \
+          --run-command 'dpkg-reconfigure -pmedium unattended-upgrades' \
+          --run-command 'dpkg-reconfigure openssh-server'
+        when: copy_results is changed
+        with_dict: "{{ vms }}"
+    
+      # Spwan the VMs 
+      - name: Define vm
+        command: >
+               virt-install --name {{ item.key }} 
+               --disk /var/lib/libvirt/images/{{ item.key }}.qcow2 
+               --vcpus {{ item.value.vcpu }}
+               --cpu host-model 
+               --memory {{ item.value.memory }}
+               --network bridge={{ item.value.network }}
+               --virt-type kvm 
+               --import 
+               --os-variant ubuntu20.04 
+               --graphics vnc 
+               --serial pty 
+               --noautoconsole 
+               --console pty,target_type=virtio
+        with_dict: "{{ vms }}"   
+
+      - name: start vm
+        virt:
+          name: "{{ item.key }}"
+          state: running
+        with_dict: "{{ vms }}"
+        register: vm_start_results
+
+    when: item.key not in vms_list.list_vms
+
+
