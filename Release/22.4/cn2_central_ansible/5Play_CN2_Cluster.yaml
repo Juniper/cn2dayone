@@ -1,0 +1,114 @@
+---
+# Playbook to install CN2 as a CNI and complete CN2 Central Cluster deployment
+- name: Install required packages on Jumpshost
+  hosts: centraljumphost
+  become: yes
+  vars_prompt:
+    - name: docker_username
+      prompt: Enter Enterprise_Hub.juniper.net Username?
+      private: false
+    - name: docker_password
+      prompt: Enter Password?
+      
+
+  tasks:
+# Install Docker
+    - name: Install required system packages for docker installtion
+      apt:
+        pkg:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - python3-pip
+          - virtualenv
+          - python3-setuptools
+        state: latest
+        update_cache: true
+
+    # Add Docker apt-key
+    - name: Add Docker GPG apt Key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    # Add Docker repo for docker installation
+    - name: Add Docker Repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu focal stable
+        state: present
+
+    # Update apt and install docker
+    - name: Update apt and install docker-ce
+      apt:
+        name: docker-ce
+        state: latest
+        update_cache: true
+
+    - name: Install Docker Module for Python
+      pip:
+        name: docker
+
+# Docker Login & save credentials to a variable
+    - name: Log into DockerHub
+      docker_login:
+        registry: "enterprise-hub.jnpr.net"
+        username: "{{ docker_username }}"
+        password: "{{ docker_password }}"
+        state: present
+        reauthorize: yes
+
+    - name: Retrieve credenials into a variable
+      command: base64 -w 0 /root/.docker/config.json
+      register: baseoutput
+
+#    - name: Print return into variable
+#      debug: 
+#        var: baseoutput.stdout
+
+# git clone from Juniper github repo
+    - name: Clone a git repo
+      command: git clone https://github.com/Juniper/contrail-networking.git
+      args:
+        chdir: /root/
+        creates: /root/contrail-networking
+
+# update the yaml deployer files with docker secret.
+    - name: Find all files to replace text
+      find: 
+        paths: "/root/contrail-networking/releases/22.4/k8s/multi-cluster/"
+        patterns: "*.yaml"
+      register: yaml_files
+
+    - name: Add Encoded text inside yaml files
+      ansible.builtin.replace:
+        path: "{{ item.path }}"
+        regexp: '<base64-encoded-credential>'
+        replace: '{{ baseoutput.stdout }}'
+      with_items: "{{ yaml_files.files }}"
+
+# update correct enterprise-hub.jnpr.net
+    - name: Replace enterprise-hub.juniper.net to enterprise-hub.jnpr.net
+      ansible.builtin.replace:
+        path: "{{ item.path }}"
+        regexp: 'enterprise-hub.juniper.net'
+        replace: 'enterprise-hub.jnpr.net'
+      with_items: "{{ yaml_files.files }}" 
+    
+# Deploy the central contrail deployer
+   
+    - name: Deploy CN2 on k8s Cluster
+      command: "kubectl apply -f  /root/contrail-networking/releases/22.4/k8s/multi-cluster/central_cluster_deployer_example.yaml"
+      register: output_deploy
+
+# Reset the DNS on vhost interface to elevate the chicken egg state
+    - name: Reset DNS resolution
+      register: dns_reset
+      command: resolvectl dns vhost0 66.129.233.81
+      retries : 30
+      delay: 25
+      register: result_reset_dns
+      until: result_reset_dns.rc == 0
+      delegate_to: "{{ item }}"
+      delegate_facts: true
+      loop: "{{ groups['centralk8svm'] }}"  

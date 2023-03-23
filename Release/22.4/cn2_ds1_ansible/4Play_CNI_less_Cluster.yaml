@@ -1,0 +1,56 @@
+---
+#This playbook will install k7s cluster using Kubespray without a CNI
+  - name: Install k8s cluster without CNI
+    hosts: ds1jumphost
+    gather_facts: yes
+    tasks:
+      - name: Copy inventory into jumphost
+        ansible.builtin.copy:
+          src: k8s_inventory.yaml
+          dest: kubespray/inventory/inventory.yaml
+      - name: Update the inventory file
+        replace:
+          path: kubespray/inventory/inventory.yaml
+          regexp: >-
+            ansible_host: ds1ctrl
+          replace: >-
+            ansible_host: {{ hostvars['ds1ctrl'].ansible_host }}
+
+      - name: Update the inventory file
+        replace:
+          path: kubespray/inventory/inventory.yaml
+          regexp: >-
+            ansible_host: ds1worker1
+          replace: >-
+            ansible_host: {{ hostvars['ds1worker1'].ansible_host }}
+
+      - name: Update the inventory file
+        replace:
+          path: kubespray/inventory/inventory.yaml
+          regexp: >-
+            ansible_host: ds1worker2
+          replace: >-
+            ansible_host: {{ hostvars['ds1worker2'].ansible_host }}
+  
+      # Ping and confirm all cluster nodes are reachable
+      - name: Ping Test  
+        command: "ansible -i /root/kubespray/inventory/inventory.yaml -m ping all"
+        register: output_ping
+  
+      # Deploy the cluster nodes with k8s as defined in inventory file
+      - name: Deploy Cluster
+        command: "ansible-playbook -i /root/kubespray/inventory/inventory.yaml /root/kubespray/cluster.yml"
+        register: output_deploy
+
+      # Create .kube directory to host the k8s config file
+      - name : Create Directory
+        ansible.builtin.file:
+          path: ~/.kube
+          state: directory
+          mode: '0755'
+      # Copy the k8s kube config into the .kube folder
+      - name: Copying kube config 
+        ansible.builtin.copy:
+          src: /tmp/mycluster/admin.conf
+          dest: ~/.kube/config
+          remote_src: yes

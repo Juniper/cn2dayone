@@ -1,0 +1,123 @@
+---
+# Preparing the KubeSpray Jumphost 
+- name: Install required packages on KubeSpray Host
+  hosts: centraljumphost
+  become: yes
+  tasks:
+    # Update apt-key for installing kubectl
+    - name: Add apt-key to update kubernetes repo to install Kubectl
+      ansible.builtin.apt_key:
+        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+
+    # Update repo for installing kubectl
+    - name: Add specified repository into sources list to install Kubectl
+      ansible.builtin.apt_repository:
+        repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+        state: present
+        filename: kubernetes.list
+
+    # Update apt 
+    - name: update apt
+      apt:
+        update_cache: yes
+        cache_valid_time: 432000
+      retries: 2
+      delay: 10
+
+    # Update apt-key for installing helm
+    - name: Add apt-key to update helm repo for installing Helm
+      ansible.builtin.apt_key:
+        url: https://baltocdn.com/helm/signing.asc
+ 
+    # Update repo for installing Helm
+    - name: Add specified repository into sources list for installing Helm
+      ansible.builtin.apt_repository:
+        repo: deb https://baltocdn.com/helm/stable/debian/ all main
+        state: present
+        filename: helm-stable-debian.list
+
+    # Update apt
+    - name: update apt
+      apt:
+        update_cache: yes
+        cache_valid_time: 432000
+      retries: 2
+      delay: 10 
+
+    # Install packages
+    - name: Update apt cache and install kubectl, helm, sshpass and python3-pip
+      apt:
+        name: "{{ item }}"
+        update_cache: yes
+      retries: 2
+      delay: 10
+      loop:
+        - sshpass
+        - kubectl
+        - helm
+        - python3-pip
+
+    # Clone Kubespray repo
+    - name: clone kubespray
+      ansible.builtin.git:
+        repo: https://github.com/kubernetes-sigs/kubespray
+        dest: /root/kubespray
+        version: release-2.20
+
+    # Set nodelocaldns to false in kubespray defaul main yaml file
+    - name: Set nodelocaldns to false in kubespray main.yaml
+      ansible.builtin.replace:
+        path: kubespray/roles/kubespray-defaults/defaults/main.yaml
+        regexp: "enable_nodelocaldns: true"
+        replace: "enable_nodelocaldns: false"
+
+    - name: Install Kubespray requirements
+      command: "pip install -U -r kubespray/requirements.txt"
+      register: output_requirements
+
+    # Scan the IPs and update the public keys for passowrd less login
+    - name: Set Facts for next steps
+      set_fact:
+        ssh_known_hosts_command: "ssh-keyscan -T 10"
+        ssh_known_hosts_file: "{{ lookup('env','HOME') + '/.ssh/known_hosts' }}"
+        ssh_known_hosts: "{{ groups['allcentral'] }}"
+
+    - name: For each host, scan for its ssh public key
+      shell: "ssh-keyscan {{ item }},`dig +short {{ item }}`"
+      with_items: "{{ ssh_known_hosts }}"
+      register: ssh_known_host_results
+      ignore_errors: yes
+
+    - name: Add/update the public key in the '{{ ssh_known_hosts_file }}'
+      known_hosts:
+        name: "{{ item.item }}"
+        key: "{{ item.stdout }}"
+        path: "{{ ssh_known_hosts_file }}"
+      with_items: "{{ ssh_known_host_results.results }}"
+
+- name: Upload ssh keys between servers
+  become: yes
+  become_user: root
+  hosts: allcentral
+  tasks:
+    - name: SSH KeyGen command
+      tags: run
+      shell: > 
+        ssh-keygen -q -b 2048 -t rsa -N "" -C "creating ssh" -f ~/.ssh/id_rsa
+        creates="~/.ssh/id_rsa"
+    - name: Fetch the keyfile from one server to another
+      tags: run
+      fetch: 
+        src: "~/.ssh/id_rsa.pub"
+        dest: "buffer/{{ansible_hostname}}-id_rsa.pub"
+        flat: yes
+    - name: Copy the key add to authorized_keys using Ansible module
+      tags: run
+      authorized_key:
+        user: root
+        state: present
+        key: "{{ lookup('file','buffer/{{item}}-id_rsa.pub')}}"
+      when: " item != ansible_hostname "
+      with_items: 
+        - "{{ groups['allcentral'] }}"     
+
