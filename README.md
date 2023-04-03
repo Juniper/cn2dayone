@@ -7,9 +7,10 @@ https://www.juniper.net/documentation/us/en/software/cn-cloud-native22.4/cn-clou
 
 Upon cloning the repo user will see 2 folders: 
 
-[1] cn2_central_ansible  -- Ansible playbooks to deploy a central cluster
+[1] Release -- Contains manifest files for each release of CN2
+[2] thelitmustest -- Contains files for deploying the test application on Cn2 cluster for testing
 
-[2] cn2_ds1_ansible  -- Ansible playbooks to deploy a distributed cluster
+Under Release folder, user will find folders for each release. Once you navigate to particular release folder, there will one folder for each type of cluster deployment, ie, cn2_central_ansible and cn2_ds1_anisble
 
 Both will have 5 yaml playbook to install a cluster from scratch.
 Playbooks are marked in numerical order defining the order it needs to be executed in lab.
