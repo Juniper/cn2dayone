@@ -78,7 +78,7 @@
           virt-customize -a /var/lib/libvirt/images/{{ item.key }}.qcow2 \
           --root-password password:juniper123 \
           --hostname {{ item.key }} \
-          --upload /root/cn2_deploy_ansible/cn2_central_ansible/{{ item.key }}.yaml:/etc/netplan/00-installer-config.yaml \
+          --upload /root/cn2dayone/Release/22.4/cn2_central_ansible/{{ item.key }}.yaml:/etc/netplan/00-installer-config.yaml \
           --mkdir /root/.ssh \
           --copy-in /root/.ssh/id_rsa.pub:/root/.ssh/ \
           --copy /root/.ssh/id_rsa.pub:/root/.ssh/authorized_keys \
