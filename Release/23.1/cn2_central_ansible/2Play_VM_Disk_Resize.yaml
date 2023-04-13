@@ -1,0 +1,69 @@
+---
+  # Grow and resize the VMs to resized disk space
+  - name: Update /etc/hosts among all Vms and resize the VMs Disk 
+    hosts: allcentral
+    gather_facts: no
+    
+    tasks:
+    - name: Wait for system to become reachable
+      ansible.builtin.wait_for_connection:
+        timeout: 300
+
+    - name: gather Facts
+      ansible.builtin.setup:
+
+    # Update all VMs /etc/hosts file with IP address for all hosts in topology
+    - name: Update /etc/hosts for all VMs
+      lineinfile:
+        dest: /etc/hosts
+        regexp: '.*{{ item }}$'
+        line: "{{ hostvars[item].ansible_host }} {{item}}"
+        state: present
+      when: hostvars[item].ansible_host is defined
+      with_items: "{{ groups.all }}"
+
+
+    - name: Set time to local time   
+      command: timedatectl set-local-rtc 1
+
+    - name: Update apt cache and install ntp
+      apt:
+        name: "{{ item }}"
+        update_cache: yes
+      loop:
+        - ntp
+
+    - name: Update /etc/ntp.conf
+      ansible.builtin.replace:
+        path: /etc/ntp.conf
+        regexp: 'ntp.ubuntu.com'
+        replace: 'ntp.juniper.net'
+        backup: yes
+
+#    - Restart ntp 
+    - name: restart ntp
+      command: "dpkg-reconfigure ntp"
+
+    # Assert for if root partition is expanded and require a resize
+    - name: Assert root partition requires expansion
+      assert: { that: item.mount != '/' or item.size_total > 10737418240 } # 10 GB
+      with_items: "{{ ansible_mounts }}"
+      ignore_errors: yes
+      register: expanded
+
+    # Grow the partition to the max size
+    - name: Expand partition
+      command: "growpart /dev/vda 1"
+      when: expanded or failed
+      notify: Expand filesystem
+      ignore_errors: True
+      register: result
+#      failed_when:
+#        - result.rc ==  
+
+    handlers:
+      - name: Expand filesystem
+        register: resizeoutput
+        command: "resize2fs /dev/vda1"
+
+
